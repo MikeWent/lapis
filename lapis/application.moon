@@ -302,6 +302,10 @@ class Application
 
   handle_404: =>
     error "Failed to find route: #{@req.cmd_url}"
+  
+  handle_405: (allowed) =>
+    @res.headers["Allow"] = table.concat allowed, ", "
+    status: 405, layout: false
 
   handle_error: (err, trace) =>
     @status = 500
@@ -330,13 +334,25 @@ respond_to = do
         if before = tbl.before
           return if run_before_filter before, @
         fn @
+      elseif tbl.default
+        tbl.default @
       else
-        (tbl.on_invalid_method or on_invalid_method) @
+        methods = [k for k, v in pairs tbl when k == k\upper!]
+        @app.handle_405 @, methods
 
     if error_response = tbl.on_error
       out = capture_errors out, error_response
 
     out
+
+restrict = (methods, action) ->
+  if action == nil
+    action = methods
+    methods = {'GET', 'HEAD'}
+  =>
+    for method in *methods
+      return action @ if @req.cmd_mth == method
+    @app.handle_405 @, methods
 
 default_error_response = -> { render: true }
 capture_errors = (fn, error_response=default_error_response) ->
@@ -387,9 +403,13 @@ json_params = (fn) ->
     fn @, ...
 
 {
+<<<<<<< HEAD
   Request: Application.Request
 
   :Application, :respond_to
+=======
+  :Request, :Application, :respond_to, :restrict
+>>>>>>> 0c1fdef6d2746e2c3ba0c403020fce662eacdf9d
   :capture_errors, :capture_errors_json
   :json_params, :assert_error, :yield_error
 }

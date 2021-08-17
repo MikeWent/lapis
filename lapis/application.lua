@@ -217,15 +217,45 @@ do
     handle_404 = function(self)
       return error("Failed to find route: " .. tostring(self.req.cmd_url))
     end,
-    handle_error = function(self, err, trace)
-      self.status = 500
-      self.err = err
-      self.trace = trace
+    handle_405 = function(self, allowed)
+      self.res.headers["Allow"] = table.concat(allowed, ", ")
       return {
-        status = 500,
-        layout = false,
-        render = self.app.error_page
+        status = 405,
+        layout = false
       }
+    end,
+    handle_error = function(self, err, trace, error_page)
+      if error_page == nil then
+        error_page = self.app.error_page
+      end
+      local r = self.app.Request(self, self.req, self.res)
+      local config = lapis_config.get()
+      if config._name == "test" then
+        local param_dump = logger.flatten_params(self.url_params)
+        r.res:add_header("X-Lapis-Error", "true")
+        r:write({
+          status = 500,
+          json = {
+            status = "[" .. tostring(r.req.cmd_mth) .. "] " .. tostring(r.req.cmd_url) .. " " .. tostring(param_dump),
+            err = err,
+            trace = trace
+          }
+        })
+      else
+        r:write({
+          status = 500,
+          layout = false,
+          content_type = "text/html",
+          error_page({
+            status = 500,
+            err = err,
+            trace = trace
+          })
+        })
+      end
+      r:render()
+      logger.request(r)
+      return r
     end,
     cookie_attributes = function(self, name, value)
       return "Path=/; HttpOnly"
@@ -403,8 +433,26 @@ do
           end
         end
         return fn(self)
+      elseif tbl.default then
+        return tbl.default(self)
       else
+<<<<<<< HEAD
         return (tbl.on_invalid_method or on_invalid_method)(self)
+=======
+        local methods
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for k, v in pairs(tbl) do
+            if k == k:upper() then
+              _accum_0[_len_0] = k
+              _len_0 = _len_0 + 1
+            end
+          end
+          methods = _accum_0
+        end
+        return self.app.handle_405(self, methods)
+>>>>>>> 0c1fdef6d2746e2c3ba0c403020fce662eacdf9d
       end
     end
     do
@@ -414,6 +462,25 @@ do
       end
     end
     return out
+  end
+end
+local restrict
+restrict = function(methods, action)
+  if action == nil then
+    action = methods
+    methods = {
+      'GET',
+      'HEAD'
+    }
+  end
+  return function(self)
+    for _index_0 = 1, #methods do
+      local method = methods[_index_0]
+      if self.req.cmd_mth == method then
+        return action(self)
+      end
+    end
+    return self.app.handle_405(self, methods)
   end
 end
 local default_error_response
@@ -500,6 +567,7 @@ return {
   Request = Application.Request,
   Application = Application,
   respond_to = respond_to,
+  restrict = restrict,
   capture_errors = capture_errors,
   capture_errors_json = capture_errors_json,
   json_params = json_params,

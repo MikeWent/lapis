@@ -192,10 +192,13 @@ different ways to generate URLs to pages.
 
 ## Handling HTTP verbs
 
+### `respond_to({verbs: actions})`
+
 It's common to have a single action do different things depending on the HTTP
 verb. Lapis comes with some helpers to make writing these actions simple.
 `respond_to` takes a table indexed by HTTP verb with a value of the function to
-perform when the action receives that verb.
+perform when the action receives that verb. You may optionally also supply a
+`default` table entry to handle all remaining verbs.
 
 ```lua
 local lapis = require("lapis")
@@ -209,6 +212,9 @@ app:match("create_account", "/create-account", respond_to({
   POST = function(self)
     do_something(self.params)
     return { redirect_to = self:url_for("index") }
+  end,
+  default = function(self)
+    return "I don't know what you want, but you should use GET or POST."
   end
 }))
 ```
@@ -224,6 +230,9 @@ class App extends lapis.Application
     POST: =>
       do_something @params
       redirect_to: @url_for "index"
+    
+    default: =>
+      "I don't know what you want, but you should use GET or POST."
   }
 ```
 
@@ -232,7 +241,8 @@ corresponding HTTP verb action. We do this by specifying a `before` function.
 The same semantics of [before filters](#before-filters) apply, so if you call
 <span class="for_moon">`@write`</span><span
 class="for_lua">`self:write()`</span> then the rest of the action will not get
-run.
+run. Note that the `before` function does not apply to the `default`, if you
+supplied one.
 
 ```lua
 local lapis = require("lapis")
@@ -298,6 +308,109 @@ app:delete("/delete-account", function(self)
 end)
 
 ```
+
+### `restrict(verbs={"GET", "HEAD"}, action)`
+
+Another common pattern is to allow only particular verbs, but not do different
+things depending on the chosen verb. For example, a write-only interface may
+allow both PUT and POST and handle them in the same way, while permitting
+nothing else.
+
+```lua
+local lapis = require("lapis")
+local app = lapis.Application()
+
+app:match("upload", "/file/upload", restrict({"PUT", "POST"},
+  function(self)
+    local upload = Files:create({
+      -- name, mime type, content...
+    })
+    return {
+      redirect_to = self:url_for(file, {id = upload.id})
+    }
+  end
+))
+```
+
+```moon
+lapis = require "lapis"
+import restrict from require "lapis.application"
+
+class App extends lapis.Application
+  [upload: "/file/upload"]: restrict {"PUT", "POST"}, =>
+    upload = Files\create {
+      -- name, mime type, content...
+    }
+    redirect_to: @url_for(file, id: upload.id)
+```
+
+Another use case would be an action where the GET action is the same as the
+HEAD action plus some additional work. Allowing GET and HEAD but nothing else
+is so common, that the table of allowed verbs can be left out for this
+particular scenario.
+
+```lua
+local lapis = require("lapis")
+local app = lapis.Application()
+
+app:match("index", "/", restrict(
+  function(self)
+    local render, layout = false, false
+    if self.req.cmd_mth == "GET" then
+      render, layout = true, true
+    end
+    -- perform database access
+    -- set status code, options and special headers
+    return {
+      render = render,
+      layout = layout,
+      options = options,
+      status = status
+    }
+  end
+))
+```
+
+```moon
+lapis = require "lapis"
+import restrict from require "lapis.application"
+
+class App extends lapis.Application
+  [index: "/"]: restrict =>
+    render, layout = false, false
+    if @req.cmd_mth == "GET"
+      render, layout = true, true
+    -- perform database access
+    -- set status code, options and special headers
+    :render, :layout, :options, :status
+```
+
+### `app:handle_405(allowed_methods)`
+
+If a client attempts to access an action with a verb that wasn't defined in the
+table passed to `respond_to` and there was no `default` either, the request
+falls through to the application's `handle_405` method. The same happens to
+requests with a verb that was disallowed in a `restrict` action. The default
+implementation of `handle_405` looks like this:
+
+```lua
+  handle_405 = function(self, allowed)
+    self.res.headers["Allow"] = table.concat(allowed, ", ")
+    return {
+      status = 405,
+      layout = false
+    }
+  end
+```
+
+```moon
+  handle_405: (allowed) =>
+    @res.headers["Allow"] = table.concat allowed, ", "
+    status: 405, layout: false
+```
+
+You can override `handle_405` in your application. Note that it must take a
+table of allowed methods as argument (e.g. `{'GET', 'HEAD'}`).
 
 ## Before Filters
 
