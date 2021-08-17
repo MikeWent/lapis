@@ -436,9 +436,6 @@ do
       elseif tbl.default then
         return tbl.default(self)
       else
-<<<<<<< HEAD
-        return (tbl.on_invalid_method or on_invalid_method)(self)
-=======
         local methods
         do
           local _accum_0 = { }
@@ -452,7 +449,6 @@ do
           methods = _accum_0
         end
         return self.app.handle_405(self, methods)
->>>>>>> 0c1fdef6d2746e2c3ba0c403020fce662eacdf9d
       end
     end
     do
