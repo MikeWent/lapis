@@ -2,13 +2,13 @@ package = "lapis"
 version = "dev-1"
 
 source = {
-	url = "git://github.com/leafo/lapis.git"
+	url = "git://github.com/MikeWent/lapis.git"
 }
 
 description = {
-	summary = "A web framework for MoonScript & Lua",
+	summary = "A web framework for MoonScript & Lua // Modified by Mike_Went",
 	homepage = "http://leafo.net/lapis",
-	maintainer = "Leaf Corcoran <leafot@gmail.com>",
+	maintainer = "Mike_Went <lapis@meew.me>",
 	license = "MIT"
 }
 
