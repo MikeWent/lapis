@@ -155,7 +155,35 @@ do
         end
       })
       local clone = locked_fn(self._tpl_fn)
-      parser:run(clone, scope, self._buffer)
+      local status, err = pcall(function() parser:run(clone, scope, self._buffer) end)
+      if not status then
+        local line_number
+        for l in err:gmatch('.*string "etlua"]:([0-9]+)') do
+          line_number = tonumber(l)
+        end
+        if not line_number then
+          error(err)
+        end
+
+        local i = 1
+        local user_error = ''
+        user_error = user_error .. 'Error in template\n\n'
+        for line in self._lua_code:gmatch('([^\n]+)\n') do
+          if i >= line_number - 2 and i <= line_number + 2 then
+            if i == line_number then
+              user_error = user_error .. '------->   '
+            else
+              user_error = user_error .. '           '
+            end
+            user_error = user_error .. line
+            user_error = user_error .. '\n'
+          end
+          i = i + 1
+        end
+
+        user_error = user_error .. '\n'
+        error(user_error .. err)
+      end
       release_fn(clone)
       self._buffer.widget = old_widget
       return nil
@@ -204,7 +232,8 @@ do
       local _class_1
       local _parent_1 = EtluaWidget
       local _base_1 = {
-        _tpl_fn = fn
+        _tpl_fn = fn,
+        _lua_code = lua_code
       }
       _base_1.__index = _base_1
       setmetatable(_base_1, _parent_1.__base)

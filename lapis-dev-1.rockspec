@@ -23,8 +23,7 @@ dependencies = {
 	"lua-cjson",
 	"luaossl",
 	"luafilesystem",
-	"luasocket",
-	"pgmoon",
+	"luasocket"
 }
 
 build = {

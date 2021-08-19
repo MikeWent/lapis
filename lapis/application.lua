@@ -224,38 +224,15 @@ do
         layout = false
       }
     end,
-    handle_error = function(self, err, trace, error_page)
-      if error_page == nil then
-        error_page = self.app.error_page
-      end
-      local r = self.app.Request(self, self.req, self.res)
-      local config = lapis_config.get()
-      if config._name == "test" then
-        local param_dump = logger.flatten_params(self.url_params)
-        r.res:add_header("X-Lapis-Error", "true")
-        r:write({
-          status = 500,
-          json = {
-            status = "[" .. tostring(r.req.cmd_mth) .. "] " .. tostring(r.req.cmd_url) .. " " .. tostring(param_dump),
-            err = err,
-            trace = trace
-          }
-        })
-      else
-        r:write({
-          status = 500,
-          layout = false,
-          content_type = "text/html",
-          error_page({
-            status = 500,
-            err = err,
-            trace = trace
-          })
-        })
-      end
-      r:render()
-      logger.request(r)
-      return r
+    handle_error = function(self, err, trace)
+      self.status = 500
+      self.err = err
+      self.trace = trace
+      return {
+        status = 500,
+        layout = false,
+        render = self.app.error_page
+      }
     end,
     cookie_attributes = function(self, name, value)
       return "Path=/; HttpOnly"
